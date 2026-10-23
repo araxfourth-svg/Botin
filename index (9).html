@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Botín — El Robot Explorador</title>
+<meta name="description" content="Conversá con Botín, un robot explorador con inteligencia artificial que descubre los secretos del monte formoseño.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky1:#5fb8f2; --sky2:#d9f2ff; --leaf:#4f9d2d; --leaf-d:#2f6b1c; --mint:#7bffd6; --cyan:#2ec5e6;
+  --ink:#10321f; --paper:#fbfff7;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{
+  font-family:'Nunito',system-ui,sans-serif; color:var(--ink);
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 55%,#e9f7cf 100%);
+  display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.bg{position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none}
+header,main,footer,.panel{position:relative; z-index:1}
+header{padding:14px 18px 0; text-align:center}
+h1{font-family:'Baloo 2',sans-serif; font-weight:800; font-size:clamp(1.5rem,5vw,2.4rem); line-height:1.05; color:var(--leaf-d); letter-spacing:.2px; text-shadow:0 2px 0 rgba(255,255,255,.7)}
+header p{font-weight:700; font-size:clamp(.85rem,2.4vw,1rem); color:#1c5a7a}
+main{flex:1; min-height:0; position:relative}
+#stage{position:absolute; inset:0}
+#stage canvas{width:100%; height:100%; display:block}
+.panel{padding:6px 16px 8px; display:flex; flex-direction:column; align-items:center; gap:10px}
+.bubble{
+  min-height:3.4em; max-width:min(680px,100%); width:100%; padding:10px 16px; border-radius:18px;
+  background:rgba(255,255,255,.88); border:2px solid #bfe7f5; font-size:1rem; line-height:1.35; text-align:center;
+  display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);
+}
+.bubble small{display:block; color:#4a6f5c; font-weight:700; margin-bottom:2px}
+.status{display:flex; align-items:center; gap:8px; font-weight:800; font-size:.95rem; color:var(--leaf-d)}
+.dot{width:12px; height:12px; border-radius:50%; background:#9ab8a4; box-shadow:0 0 0 0 transparent}
+body[data-state=listening] .dot{background:var(--cyan); animation:pulse 1.2s infinite}
+body[data-state=thinking] .dot{background:#b6e61f; animation:pulse .6s infinite}
+body[data-state=speaking] .dot{background:var(--mint); animation:pulse .9s infinite}
+body[data-state=connecting] .dot{background:#f2c230; animation:pulse .6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,197,230,.7)}100%{box-shadow:0 0 0 12px rgba(46,197,230,0)}}
+.actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
+button{
+  font-family:'Baloo 2',sans-serif; font-weight:800; font-size:1.15rem; border:0; cursor:pointer;
+  padding:10px 26px; border-radius:999px; transition:transform .12s, box-shadow .12s;
+}
+button:focus-visible{outline:3px solid var(--cyan); outline-offset:3px}
+button:active{transform:translateY(2px)}
+#talk{background:var(--leaf); color:#fff; box-shadow:0 5px 0 var(--leaf-d), 0 10px 20px rgba(47,107,28,.3)}
+#talk:disabled{background:#8fb67e; box-shadow:0 5px 0 #6c9a5c; cursor:wait}
+#stop{background:#fff; color:#b5383a; border:2px solid #f0b4b4; box-shadow:0 4px 0 #f0b4b4}
+[hidden]{display:none!important}
+footer{padding:0 16px 10px; text-align:center; font-size:.78rem; color:#35604a; font-weight:700}
+@media (prefers-reduced-motion:reduce){.dot{animation:none!important}}
+</style>
+</head>
+<body data-state="idle">
+
+<!-- Paisaje del monte formoseño: cielo, río celeste, algarrobo y matas -->
+<svg class="bg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+  <ellipse cx="900" cy="150" rx="150" ry="28" fill="#fff" opacity=".7"/><ellipse cx="1000" cy="170" rx="110" ry="22" fill="#fff" opacity=".7"/>
+  <ellipse cx="220" cy="110" rx="120" ry="24" fill="#fff" opacity=".6"/>
+  <path d="M0 560 Q300 520 600 560 T1200 540 V800 H0Z" fill="#8cc267"/>
+  <path d="M0 610 Q320 590 600 620 T1200 600 V660 Q900 640 600 670 T0 660Z" fill="#7fd0ee"/>
+  <path d="M0 660 Q300 640 600 670 T1200 650 V800 H0Z" fill="#5f9b3c"/>
+  <g fill="#3f7d2a"><circle cx="1040" cy="500" r="70"/><circle cx="1110" cy="520" r="55"/><circle cx="960" cy="520" r="50"/></g>
+  <rect x="1060" y="540" width="14" height="40" fill="#6b4a2b"/>
+  <!-- Don Algarrobo (sólo el tronco y la copa, de fondo) -->
+  <path d="M-20 800 Q40 560 20 330 L150 330 Q130 560 190 800Z" fill="#8a5a33"/>
+  <path d="M60 800 Q90 600 70 380" stroke="#6b4222" stroke-width="10" fill="none" opacity=".5"/>
+  <g fill="#5aa832"><circle cx="40" cy="260" r="150"/><circle cx="220" cy="230" r="120"/><circle cx="-30" cy="130" r="120"/><circle cx="200" cy="90" r="90"/></g>
+  <g fill="#7bc24a" opacity=".8"><circle cx="90" cy="200" r="70"/><circle cx="250" cy="170" r="60"/></g>
+  <g fill="#3f8a2a"><ellipse cx="1130" cy="740" rx="130" ry="50"/><ellipse cx="80" cy="760" rx="150" ry="50"/></g>
+</svg>
+
+<header>
+  <h1>Botín — El Robot Explorador</h1>
+  <p>Hablá con él y descubrí los secretos del monte formoseño</p>
+</header>
+
+<main><div id="stage" role="img" aria-label="Botín, un robot explorador blanco y verde con ojos digitales"></div></main>
+
+<section class="panel" aria-live="polite">
+  <div class="bubble" id="bubble">Apretá el botón y preguntale lo que quieras: naturaleza, tecnología, tareas, chistes…</div>
+  <div class="status"><span class="dot"></span><span id="status">Listo para explorar</span></div>
+  <div class="actions">
+    <button id="talk" type="button">Hablar con Botín</button>
+    <button id="stop" type="button" hidden>Finalizar conversación</button>
+  </div>
+</section>
+
+<footer>Botín es un personaje ficticio que funciona con inteligencia artificial. Puede equivocarse: verificá los datos importantes. No compartas datos personales.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ================== CONFIGURACIÓN ==================
+   Para sumar a Don Algarrobo y al Profesor Lechu más adelante, cada personaje
+   tendrá su propio agente (agentId) con su propia voz. */
+const CONFIG = {
+  agentId: 'agent_6501m5k99cj6fwcbhjrg0y8qbpyk',   // Botín — Robot Explorador (ElevenLabs)
+  sdkUrl: 'https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm'
+};
+
+const $ = s => document.querySelector(s);
+const LABELS = {idle:'Listo para explorar', connecting:'Conectando mis circuitos…', listening:'Te estoy escuchando…',
+                thinking:'Procesando pregunta…', speaking:'Botín está hablando', error:'Algo falló'};
+let state = 'idle', expr = 'happy', conv = null, mouth = 0, inVol = 0, exprTimer = 0;
+
+function setState(s){ state = s; document.body.dataset.state = s; $('#status').textContent = LABELS[s]; }
+function say(text, who){
+  const b = $('#bubble'), d = document.createElement('div'); b.textContent = '';
+  if(who){ const s = document.createElement('small'); s.textContent = who; d.appendChild(s); }
+  d.appendChild(document.createTextNode(text)); b.appendChild(d);
+}
+function exprFrom(t){
+  t = t.toLowerCase();
+  if(/error 404|no estoy seguro|no sé|no se si/.test(t)) return 'confused';
+  if(/sorprend|wow|increíble|circuitos|¡guau|que genial|qué genial/.test(t)) return 'surprised';
+  return 'happy';
+}
+
+/* ================== ROBOT 3D ================== */
+const stage = $('#stage');
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, .1, 100);
+scene.add(new THREE.HemisphereLight(0xdff3ff, 0x6a8f4a, .95));
+const key = new THREE.DirectionalLight(0xfff1d6, 1.15); key.position.set(3, 5, 6); scene.add(key);
+const rim = new THREE.DirectionalLight(0x7bffd6, .55); rim.position.set(-5, 2, -4); scene.add(rim);
+
+const M = (c, o) => new THREE.MeshStandardMaterial(Object.assign({color:c, roughness:.45, metalness:.08}, o));
+const mWhite = M(0xf4f0e6), mGreen = M(0x7dc242, {roughness:.5}), mTeal = M(0x3f95b3), mDark = M(0x2c3236, {roughness:.6}),
+      mPack = M(0x56602f, {roughness:.8}), mRoll = M(0x8a6a3e, {roughness:.9});
+const mGlow = new THREE.MeshBasicMaterial({color:0x59f0ff});
+const add = (p, g, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); p.add(o); return o; };
+const SPH = (r, w = 32, h = 24) => new THREE.SphereGeometry(r, w, h);
+const CYL = (a, b, h, s = 24) => new THREE.CylinderGeometry(a, b, h, s);
+const ring = (p, r, t, y, m = mGreen) => { const o = add(p, new THREE.TorusGeometry(r, t, 10, 28), m, 0, y, 0); o.rotation.x = Math.PI / 2; return o; };
+
+const robot = new THREE.Group(); scene.add(robot);
+
+// Cabeza (elipsoide) + pantalla curva que sigue su forma
+const head = new THREE.Group(); head.position.y = 1.25; robot.add(head);
+const HS = [1.25, .9, .9];
+add(head, SPH(1, 56, 40), mWhite).scale.set(...HS);
+const fc = document.createElement('canvas'); fc.width = 640; fc.height = 340; const fx = fc.getContext('2d');
+const faceTex = new THREE.CanvasTexture(fc); faceTex.encoding = THREE.sRGBEncoding; faceTex.anisotropy = 4;
+const screen = add(head, new THREE.SphereGeometry(1, 56, 32, Math.PI / 2 - .82, 1.64, Math.PI / 2 - .52, 1.04),
+  new THREE.MeshBasicMaterial({map:faceTex}));
+screen.scale.set(HS[0] * 1.012, HS[1] * 1.012, HS[2] * 1.012);
+const topStripe = add(head, new THREE.SphereGeometry(1, 40, 12, Math.PI / 2 - .5, 1, .12, .5), mGreen);
+topStripe.scale.set(HS[0] * 1.015, HS[1] * 1.015, HS[2] * 1.015);
+for(const s of [-1, 1]){                       // auriculares celestes
+  const e = add(head, CYL(.4, .4, .38, 32), mTeal, s * 1.2, 0, 0); e.rotation.z = Math.PI / 2;
+  const g = add(head, CYL(.26, .26, .4, 32), mGlow, s * 1.2, 0, 0); g.rotation.z = Math.PI / 2;
+}
+add(head, CYL(.16, .2, .14), mDark, 0, .9, 0);   // antena
+add(head, CYL(.04, .04, .5, 10), mGreen, 0, 1.2, 0);
+const antBall = add(head, SPH(.15, 20, 16), new THREE.MeshBasicMaterial({color:0x59f0ff}), 0, 1.5, 0);
+
+// Cuello, cuerpo, emblema de hoja, mochila
+add(robot, CYL(.2, .26, .3), mDark, 0, .3, 0);
+const body = add(robot, SPH(1, 40, 32), mWhite, 0, -.5, 0); body.scale.set(.78, .88, .64);
+ring(robot, .62, .06, -.05);
+const lc = document.createElement('canvas'); lc.width = lc.height = 128; const lx = lc.getContext('2d');
+lx.fillStyle = '#103a2a'; lx.beginPath(); lx.arc(64, 64, 62, 0, 7); lx.fill();
+lx.fillStyle = '#7bffd6'; lx.shadowColor = '#7bffd6'; lx.shadowBlur = 8;
+for(const a of [-.6, .6]){ lx.save(); lx.translate(64, 98); lx.rotate(a); lx.beginPath(); lx.moveTo(0, 0);
+  lx.quadraticCurveTo(-30, -30, 0, -66); lx.quadraticCurveTo(30, -30, 0, 0); lx.fill(); lx.restore(); }
+const lt = new THREE.CanvasTexture(lc); lt.encoding = THREE.sRGBEncoding;
+add(robot, new THREE.CircleGeometry(.34, 32), new THREE.MeshBasicMaterial({map:lt}), 0, -.3, .62);
+add(robot, new THREE.BoxGeometry(1.05, 1.15, .5), mPack, 0, -.35, -.72);
+const roll = add(robot, CYL(.22, .22, 1.1, 20), mRoll, 0, .35, -.78); roll.rotation.z = Math.PI / 2;
+add(robot, new THREE.BoxGeometry(.9, .12, .12), mDark, 0, -.1, -.5);
+
+// Brazos
+function makeArm(side){
+  const root = new THREE.Group(); root.position.set(side * .88, -.1, .05); robot.add(root);
+  add(root, SPH(.2, 20, 16), mDark);
+  add(root, CYL(.15, .15, .5, 20), mWhite, 0, -.3, 0); ring(root, .16, .05, -.2);
+  const fore = new THREE.Group(); fore.position.y = -.58; root.add(fore);
+  add(fore, SPH(.17, 18, 14), mDark);
+  add(fore, CYL(.14, .13, .45, 20), mWhite, 0, -.28, 0); ring(fore, .15, .045, -.14);
+  const hand = add(fore, SPH(.2, 18, 14), mWhite, 0, -.62, 0); hand.scale.set(1, 1.1, .7);
+  for(let i = -1; i <= 1; i++){ const f = add(fore, CYL(.045, .05, .2, 8), mDark, i * .1, -.8, 0); f.rotation.z = -i * .25; }
+  return {root, fore};
+}
+const armR = makeArm(1), armL = makeArm(-1);
+
+// Piernas y pies
+for(const s of [-1, 1]){
+  add(robot, CYL(.17, .17, .5), mWhite, s * .36, -1.45, 0);
+  const t = add(robot, new THREE.TorusGeometry(.18, .05, 10, 24), mGreen, s * .36, -1.35, 0); t.rotation.x = Math.PI / 2;
+  const foot = add(robot, SPH(1, 28, 20), mWhite, s * .38, -1.78, .14); foot.scale.set(.4, .22, .56);
+  const gs = add(robot, SPH(1, 24, 12, 0, 6.3, 0, 1.1), mGreen, s * .38, -1.78, .14); gs.scale.set(.415, .235, .58);
+  const sole = add(robot, SPH(1, 28, 6, 0, 6.3, 1.9, 1.2), mDark, s * .38, -1.78, .14); sole.scale.set(.41, .23, .57);
+}
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight; if(!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.position.set(0, .5, Math.max(9, 5.1 / (0.63 * camera.aspect))); camera.lookAt(0, .45, 0); camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- Cara digital (pantalla) ---------- */
+function drawFace(t, blink, lookX, lookY){
+  const c = fx, W = 640, H = 340;
+  c.fillStyle = '#04100d'; c.fillRect(0, 0, W, H);
+  c.fillStyle = 'rgba(123,255,214,.05)'; for(let y = 0; y < H; y += 4) c.fillRect(0, y, W, 1);
+  const surprised = expr === 'surprised', R = surprised ? 70 : 62;
+  const eyes = [[185, 150], [455, 150]];
+  eyes.forEach(([x, y], i) => {
+    c.save(); c.translate(x, y); c.scale(1, Math.max(.06, 1 - blink * .94));
+    c.shadowColor = '#5dffc6'; c.shadowBlur = 26; c.fillStyle = '#7bffd6';
+    c.beginPath(); c.arc(0, 0, R, 0, 7); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = '#0a3a2a'; c.beginPath(); c.arc(lookX * 14, lookY * 12, R * .68, 0, 7); c.fill();
+    c.fillStyle = '#02100b'; c.beginPath(); c.arc(lookX * 18, lookY * 15, R * (surprised ? .3 : .44), 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(lookX * 18 - 14, lookY * 15 - 16, R * .13, 0, 7); c.fill();
+    c.restore();
+    // cejas
+    c.save(); c.strokeStyle = '#7bffd6'; c.lineWidth = 9; c.lineCap = 'round'; c.shadowColor = '#5dffc6'; c.shadowBlur = 14;
+    let by = 62, tilt = 0;
+    if(surprised){ by = 40; }
+    else if(expr === 'confused'){ by = i ? 78 : 44; tilt = i ? 14 : -10; }
+    else if(state === 'listening'){ by = 50; }
+    c.beginPath(); c.moveTo(x - 50, by + 14 + tilt); c.quadraticCurveTo(x, by - 12 + tilt, x + 50, by + 10 - tilt); c.stroke();
+    c.restore();
+  });
+  // boca
+  c.save(); c.shadowColor = '#5dffc6'; c.shadowBlur = 20; c.fillStyle = '#7bffd6'; c.strokeStyle = '#7bffd6'; c.lineCap = 'round';
+  const mx = 320, my = 268;
+  if(state === 'thinking'){
+    for(let k = 0; k < 3; k++){ c.globalAlpha = .35 + .65 * (Math.sin(t * 6 - k * 1.2) * .5 + .5); c.beginPath(); c.arc(mx - 40 + k * 40, my, 9, 0, 7); c.fill(); }
+  } else if(mouth > .05 || surprised){
+    const h = 10 + Math.max(mouth, surprised ? .35 : 0) * 70, w = 62 + mouth * 24;
+    c.beginPath(); c.ellipse(mx, my - 4, w, h, 0, 0, 7); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = '#0a3a2a'; c.beginPath(); c.ellipse(mx, my + h * .35, w * .6, h * .45, 0, 0, 7); c.fill();
+  } else if(expr === 'confused'){
+    c.lineWidth = 9; c.beginPath(); c.moveTo(mx - 50, my + 4); c.quadraticCurveTo(mx - 10, my - 10, mx + 50, my + 8); c.stroke();
+  } else {
+    c.lineWidth = 11; c.beginPath(); c.moveTo(mx - 70, my - 14); c.quadraticCurveTo(mx, my + 52, mx + 70, my - 14); c.stroke();
+  }
+  c.restore(); faceTex.needsUpdate = true;
+}
+
+/* ---------- Bucle de animación ---------- */
+const clock = new THREE.Clock(); let nextBlink = 2, blinkT = -1, lookTx = 0, lookTy = 0, lookX = 0, lookY = 0, nextLook = 1, px = 0;
+addEventListener('pointermove', e => { px = (e.clientX / innerWidth) * 2 - 1; });
+const lerp = (a, b, k) => a + (b - a) * k;
+
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  if(conv){ try{
+      mouth = lerp(mouth, state === 'speaking' ? Math.min(1, conv.getOutputVolume() * 2.6) : 0, .35);
+      inVol = lerp(inVol, state === 'listening' ? Math.min(1, conv.getInputVolume() * 3) : 0, .3);
+  }catch(e){} } else { mouth = lerp(mouth, 0, .3); inVol = lerp(inVol, 0, .3); }
+
+  // parpadeo y mirada
+  if(t > nextBlink && blinkT < 0){ blinkT = 0; nextBlink = t + 2 + Math.random() * 3; }
+  let blink = 0; if(blinkT >= 0){ blinkT += dt; blink = Math.sin(Math.min(1, blinkT / .18) * Math.PI); if(blinkT > .18) blinkT = -1; }
+  if(t > nextLook){ lookTx = (Math.random() - .5) * 1.6; lookTy = (Math.random() - .5) * .8; nextLook = t + 1 + Math.random() * 2; }
+  if(state === 'listening'){ lookTx = px * .8; lookTy = .1; } else if(state === 'thinking'){ lookTx = Math.sin(t * 1.5) * .8; lookTy = -.8; }
+  else if(state === 'speaking'){ lookTx = Math.sin(t * .8) * .35; lookTy = 0; }
+  lookX = lerp(lookX, lookTx, .12); lookY = lerp(lookY, lookTy, .12);
+  drawFace(t, blink, lookX, lookY);
+
+  // cuerpo y cabeza
+  const speaking = state === 'speaking', listening = state === 'listening', thinking = state === 'thinking';
+  robot.position.y = Math.sin(t * 1.8) * .05 + (speaking ? Math.abs(Math.sin(t * 5)) * .04 * mouth : 0);
+  robot.rotation.y = lerp(robot.rotation.y, px * .25 + Math.sin(t * .5) * .08, .05);
+  const tiltTarget = listening ? .16 + inVol * .05 : thinking ? -.12 : expr === 'confused' ? .2 : speaking ? Math.sin(t * 2.2) * .06 : 0;
+  head.rotation.z = lerp(head.rotation.z, tiltTarget, .08);
+  head.rotation.x = lerp(head.rotation.x, thinking ? -.1 : speaking ? Math.sin(t * 3) * .04 * mouth : 0, .1);
+  head.rotation.y = lerp(head.rotation.y, lookX * .18, .08);
+
+  // antena
+  const pulse = thinking ? (Math.sin(t * 9) * .5 + .5) : listening ? .45 + inVol * .55 : speaking ? .6 + mouth * .4 : .35 + Math.sin(t * 2) * .12;
+  antBall.material.color.setHSL(thinking ? .2 : .5, 1, .35 + pulse * .35); antBall.scale.setScalar(.85 + pulse * .6);
+
+  // brazos
+  let rz, rf, lz, lf;
+  if(speaking){ rz = 1.1 + Math.sin(t * 3.1) * .5 * (.4 + mouth); rf = .5 + Math.sin(t * 3.1 + 1) * .5; lz = -(.7 + Math.sin(t * 2.6 + 2) * .45 * (.4 + mouth)); lf = -(.4 + Math.sin(t * 2.6 + 3) * .4); }
+  else if(thinking){ rz = .3; rf = .1; lz = -1.2; lf = -2.1; }                    // mano al mentón
+  else if(listening){ rz = .22 + Math.sin(t * 1.5) * .04; rf = .1; lz = -.22; lf = -.1; }
+  else { rz = 2.35 + Math.sin(t * 2.4) * .08; rf = .35 + Math.sin(t * 6) * .35; lz = -.25; lf = -.15; }  // saluda
+  const k = Math.min(1, dt * 7);
+  armR.root.rotation.z = lerp(armR.root.rotation.z, rz, k); armR.fore.rotation.z = lerp(armR.fore.rotation.z, rf, k);
+  armL.root.rotation.z = lerp(armL.root.rotation.z, lz, k); armL.fore.rotation.z = lerp(armL.fore.rotation.z, lf, k);
+  renderer.render(scene, camera);
+}
+frame();
+
+/* ================== CONVERSACIÓN (ElevenLabs) ================== */
+const talk = $('#talk'), stop = $('#stop');
+function reset(){ conv = null; setState('idle'); expr = 'happy'; talk.hidden = false; talk.disabled = false; talk.textContent = 'Hablar con Botín'; stop.hidden = true; }
+
+talk.addEventListener('click', async () => {
+  talk.disabled = true; setState('connecting'); say('Pidiendo permiso para usar el micrófono…');
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nomic');
+    (await navigator.mediaDevices.getUserMedia({audio:true})).getTracks().forEach(tr => tr.stop());
+  }catch(e){
+    setState('error'); say('No pude acceder al micrófono. Revisá los permisos del navegador (y que la página use https) y probá de nuevo.');
+    talk.disabled = false; return;
+  }
+  try{
+    const {Conversation} = await import(CONFIG.sdkUrl);
+    conv = await Conversation.startSession({
+      agentId: CONFIG.agentId,
+      onConnect: () => { talk.hidden = true; stop.hidden = false; setState('listening'); },
+      onDisconnect: () => reset(),
+      onError: m => { console.error(m); setState('error'); say('Se cortó la conexión con Botín. Probá de nuevo.'); },
+      onModeChange: ({mode}) => { if(mode === 'speaking') setState('speaking'); else { setState('listening'); expr = 'happy'; } },
+      onMessage: ({source, message}) => {
+        if(source === 'user'){ say(message, 'Vos'); setState('thinking'); }
+        else { say(message, 'Botín'); expr = exprFrom(message); }
+      }
+    });
+  }catch(e){
+    console.error(e); conv = null; setState('error');
+    say('No pude conectar con Botín. Verificá tu conexión a internet y que el agente sea público.');
+    talk.disabled = false;
+  }
+});
+stop.addEventListener('click', async () => { stop.disabled = true; try{ await conv.endSession(); }catch(e){} reset(); stop.disabled = false; say('¡Hasta la próxima exploración! Cuando quieras, volvemos al monte.'); });
+</script>
+</body>
+</html>
